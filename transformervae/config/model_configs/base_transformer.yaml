@@ -1,0 +1,51 @@
+# Base TransformerVAE Model Configuration
+# A standard configuration suitable for most molecular generation tasks
+
+encoder:
+  - layer_type: "embedding"
+    input_dim: 26
+    output_dim: 256
+    dropout: 0.0
+    activation: "relu"
+
+  - layer_type: "transformer_encoder"
+    input_dim: 256
+    output_dim: 256
+    dropout: 0.0
+    activation: "relu"
+    layer_params:
+      num_heads: 8
+      dim_feedforward: 512
+      num_layers: 4
+
+  - layer_type: "pooling"
+    input_dim: 256
+    output_dim: 256
+    dropout: 0.0
+    activation: "linear"
+    layer_params:
+      pooling_type: "mean"
+
+sampler:
+  - layer_type: "latent_sampler"
+    input_dim: 256
+    output_dim: 64
+    dropout: 0.0
+    activation: "linear"
+
+decoder:
+  - layer_type: "transformer_decoder"
+    input_dim: 64
+    output_dim: 256
+    dropout: 0.0
+    activation: "relu"
+    layer_params:
+      num_heads: 8
+      dim_feedforward: 512
+      num_layers: 4
+
+  - layer_type: "linear"
+    input_dim: 256
+    output_dim: 26
+    dropout: 0.0
+    activation: "linear"

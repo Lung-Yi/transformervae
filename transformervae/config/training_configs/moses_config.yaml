@@ -1,0 +1,34 @@
+# MOSES Dataset Training Configuration
+# Optimized for training on the MOSES molecular dataset
+
+learning_rate: 0.003
+batch_size: 128
+epochs: 100
+beta: 0.003
+optimizer_type: "adam"
+weight_decay: 0.0001
+gradient_clip_norm: 1.0
+validation_freq: 1
+checkpoint_freq: 10
+random_seed: 42
+
+scheduler_config:
+  type: "reduce_on_plateau"
+  patience: 10
+  factor: 0.5
+  min_lr: 0.00001
+
+# Dataset-specific configuration
+dataset_config:
+  dataset_type: "moses"
+  data_path: "data/moses"
+  max_sequence_length: 100
+  vocab_size: 26
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  preprocessing_config:
+    augment_smiles: true
+    canonical: false
+    max_atoms: 50
+    add_explicit_hydrogens: false

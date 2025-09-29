@@ -1,0 +1,90 @@
+# Large TransformerVAE Model Configuration
+# A larger model for improved performance on complex molecular generation tasks
+
+encoder:
+  - layer_type: "embedding"
+    input_dim: 200
+    output_dim: 512
+    dropout: 0.1
+    activation: "relu"
+
+  - layer_type: "transformer_encoder"
+    input_dim: 512
+    output_dim: 512
+    dropout: 0.1
+    activation: "gelu"
+    layer_params:
+      num_heads: 16
+      dim_feedforward: 2048
+      num_layers: 8
+
+  - layer_type: "transformer_encoder"
+    input_dim: 512
+    output_dim: 512
+    dropout: 0.1
+    activation: "gelu"
+    layer_params:
+      num_heads: 16
+      dim_feedforward: 2048
+      num_layers: 4
+
+  - layer_type: "pooling"
+    input_dim: 512
+    output_dim: 512
+    dropout: 0.0
+    activation: "linear"
+    layer_params:
+      pooling_type: "attention"
+
+sampler:
+  - layer_type: "latent_sampler"
+    input_dim: 512
+    output_dim: 128
+    dropout: 0.0
+    activation: "linear"
+
+decoder:
+  - layer_type: "transformer_decoder"
+    input_dim: 128
+    output_dim: 512
+    dropout: 0.1
+    activation: "gelu"
+    layer_params:
+      num_heads: 16
+      dim_feedforward: 2048
+      num_layers: 8
+
+  - layer_type: "transformer_decoder"
+    input_dim: 512
+    output_dim: 512
+    dropout: 0.1
+    activation: "gelu"
+    layer_params:
+      num_heads: 16
+      dim_feedforward: 2048
+      num_layers: 4
+
+  - layer_type: "linear"
+    input_dim: 512
+    output_dim: 200
+    dropout: 0.0
+    activation: "linear"
+
+# Optional property prediction heads
+latent_regression_head:
+  - layer_type: "regression_head"
+    input_dim: 128
+    output_dim: 5
+    dropout: 0.1
+    activation: "relu"
+    layer_params:
+      hidden_dims: [256, 128]
+
+latent_classification_head:
+  - layer_type: "classification_head"
+    input_dim: 128
+    output_dim: 10
+    dropout: 0.1
+    activation: "relu"
+    layer_params:
+      hidden_dims: [256, 128]

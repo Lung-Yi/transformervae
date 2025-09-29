@@ -1,0 +1,35 @@
+# ZINC-15 Dataset Training Configuration
+# Optimized for training on the ZINC-15 molecular dataset
+
+learning_rate: 0.0005
+batch_size: 128
+epochs: 200
+beta: 0.5
+optimizer_type: "adam"
+weight_decay: 0.00005
+gradient_clip_norm: 0.5
+validation_freq: 10
+checkpoint_freq: 20
+random_seed: 123
+
+scheduler_config:
+  type: "cosine_annealing"
+  T_max: 200
+  eta_min: 0.000001
+
+# Dataset-specific configuration
+dataset_config:
+  dataset_type: "zinc15"
+  data_path: "data/zinc15"
+  max_sequence_length: 150
+  vocab_size: 1500
+  train_split: 0.85
+  val_split: 0.1
+  test_split: 0.05
+  preprocessing_config:
+    augment_smiles: true
+    canonical: true
+    max_atoms: 75
+    add_explicit_hydrogens: false
+    filter_duplicates: true
+    min_heavy_atoms: 6
