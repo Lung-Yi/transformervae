@@ -230,9 +230,6 @@ class TransformerVAE(ModelInterface):
         latent_features = self.latent_projection(z)  # (batch, embed_dim)
 
         for step in range(max_length):
-            # Debug print
-            print(f"DEBUG teacher forcing step {step}, current_sequence.shape = {current_sequence.shape}")
-
             # Get embeddings for current sequence
             embeddings = self.embedding(current_sequence)
 

@@ -21,8 +21,8 @@ scheduler_config:
 # Beta annealing schedule to gradually increase KL weight
 beta_schedule:
   type: "linear"  # linear, cosine, or cyclical
-  start_beta: 0.3   # Further increased
-  end_beta: 2.0     # Much higher to force latent usage
+  start_beta: 0.01   # Further increased
+  end_beta: 0.1     # Much higher to force latent usage
   warmup_epochs: 10 # Faster ramp-up
 
 # Dataset-specific configuration
@@ -36,6 +36,6 @@ dataset_config:
   test_split: 0.1
   preprocessing_config:
     augment_smiles: true
-    canonical: false
+    canonical: true
     max_atoms: 50
     add_explicit_hydrogens: false

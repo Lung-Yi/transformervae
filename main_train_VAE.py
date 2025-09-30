@@ -324,10 +324,20 @@ def evaluate_model(model: TransformerVAE, test_loader: DataLoader,
 
                     # Reconstruction loss - handle different output shapes
                     if reconstruction.dim() == 3:  # (batch, seq, vocab) - sequence generation
+                        # Handle sequence length mismatch (autoregressive can produce shorter sequences)
+                        recon_seq_len = reconstruction.size(1)
+                        target_seq_len = targets.size(1)
+
+                        if recon_seq_len != target_seq_len:
+                            # Align sequences: truncate targets to match reconstruction length
+                            min_len = min(recon_seq_len, target_seq_len)
+                            reconstruction = reconstruction[:, :min_len, :]
+                            targets = targets[:, :min_len]
+
                         # Use cross-entropy for categorical distribution over vocabulary
                         recon_loss = torch.nn.functional.cross_entropy(
-                            reconstruction.view(-1, reconstruction.size(-1)),
-                            targets.view(-1),
+                            reconstruction.reshape(-1, reconstruction.size(-1)),
+                            targets.reshape(-1),
                             ignore_index=0,  # Assume 0 is pad token
                             reduction='mean'
                         )

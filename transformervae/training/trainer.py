@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from typing import Dict, Any, Optional, List
 import time
 from pathlib import Path
-
+from tqdm import tqdm
 from transformervae.config.basic_config import VAETrainingConfig
 from transformervae.models.model import TransformerVAE
 from .evaluator import TrainingEvaluator
@@ -208,7 +208,7 @@ class VAETrainer:
             'num_batches': 0
         }
 
-        for batch_idx, batch in enumerate(self.train_loader):
+        for batch_idx, batch in tqdm(enumerate(self.train_loader)):
             # Move batch to device
             batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                     for k, v in batch.items()}
@@ -265,8 +265,8 @@ class VAETrainer:
                 batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                         for k, v in batch.items()}
 
-                # Forward pass with teacher forcing during validation for consistent loss computation
-                outputs = self.model(batch['sequences'], target_sequence=batch['sequences'], training=False)
+                # Forward pass with autoregressive decoding during validation
+                outputs = self.model(batch['sequences'], target_sequence=None, training=False)
 
                 # Compute loss
                 loss_dict = self._compute_loss(outputs, batch)
@@ -304,16 +304,22 @@ class VAETrainer:
             reconstruction = outputs['reconstruction']
             targets = batch['sequences']
 
-            # Debug prints
-            print(f"DEBUG: reconstruction.shape = {reconstruction.shape}")
-            print(f"DEBUG: targets.shape = {targets.shape}")
-
             # Handle different output shapes
             if reconstruction.dim() == 3:  # (batch, seq, vocab) - sequence generation
+                # Handle sequence length mismatch (autoregressive can produce shorter sequences)
+                recon_seq_len = reconstruction.size(1)
+                target_seq_len = targets.size(1)
+
+                if recon_seq_len != target_seq_len:
+                    # Align sequences: truncate targets to match reconstruction length
+                    min_len = min(recon_seq_len, target_seq_len)
+                    reconstruction = reconstruction[:, :min_len, :]
+                    targets = targets[:, :min_len]
+
                 # Use cross-entropy for categorical distribution over vocabulary
                 recon_loss = nn.functional.cross_entropy(
-                    reconstruction.view(-1, reconstruction.size(-1)),
-                    targets.view(-1),
+                    reconstruction.reshape(-1, reconstruction.size(-1)),
+                    targets.reshape(-1),
                     ignore_index=0,  # Assume 0 is pad token
                     reduction='mean'
                 )
@@ -451,8 +457,8 @@ class VAETrainer:
                 batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
                         for k, v in batch.items()}
 
-                # Forward pass with teacher forcing during evaluation for consistent loss computation
-                outputs = self.model(batch['sequences'], target_sequence=batch['sequences'], training=False)
+                # Forward pass with autoregressive decoding during evaluation
+                outputs = self.model(batch['sequences'], target_sequence=None, training=False)
 
                 # Compute loss
                 loss_dict = self._compute_loss(outputs, batch)
