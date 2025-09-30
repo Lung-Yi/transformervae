@@ -211,49 +211,30 @@ class TransformerVAE(ModelInterface):
             target_sequence: Target sequence for teacher forcing (batch_size, seq_len)
 
         Returns:
-            Decoded logits tensor (batch_size, seq_len-1, vocab_size)
+            Decoded logits tensor (batch_size, seq_len, vocab_size)
         """
         batch_size, seq_len = target_sequence.shape
-
-        # Instead of using shifted target sequence, build sequence step by step
-        # This forces the model to use latent variables at each step
-
         device = z.device
-        vocab_size = self.config.decoder[-1].output_dim
-        max_length = target_sequence.size(1)
 
-        # Initialize with SOS token
-        current_sequence = torch.ones(batch_size, 1, dtype=torch.long, device=device)
-        output_logits = []
+        # Create shifted input sequence: [SOS, token_0, token_1, ..., token_{n-2}]
+        # This is what the model sees when predicting [token_0, token_1, ..., token_{n-1}]
+        sos_token = torch.ones(batch_size, 1, dtype=torch.long, device=device)  # SOS = 1
+        decoder_input = torch.cat([sos_token, target_sequence[:, :-1]], dim=1)  # (batch, seq_len)
 
-        # Project latent to initial hidden state
+        # Get embeddings for the entire sequence at once
+        embeddings = self.embedding(decoder_input)  # (batch, seq_len, embed_dim)
+
+        # Project latent and add to all positions (broadcast)
         latent_features = self.latent_projection(z)  # (batch, embed_dim)
+        embeddings = embeddings + latent_features.unsqueeze(1)  # (batch, seq_len, embed_dim)
 
-        for step in range(max_length):
-            # Get embeddings for current sequence
-            embeddings = self.embedding(current_sequence)
+        # Pass through decoder layers - processes entire sequence in parallel
+        x = embeddings
+        for layer in self.decoder_layers:
+            x = layer(x)
 
-            # Add latent conditioning to the last position (current token being processed)
-            current_pos = embeddings.size(1) - 1
-            embeddings[:, current_pos, :] = embeddings[:, current_pos, :] + latent_features
-
-            # Pass through decoder layers
-            x = embeddings
-            for layer in self.decoder_layers:
-                x = layer(x)
-
-            # Get logits for the next token (last position)
-            next_token_logits = x[:, -1, :]  # (batch, vocab_size)
-            output_logits.append(next_token_logits.unsqueeze(1))
-
-            # Teacher forcing: use ground truth token for next step
-            if step < max_length - 1:
-                next_token = target_sequence[:, step].unsqueeze(1)  # Use actual target
-                current_sequence = torch.cat([current_sequence, next_token], dim=1)
-
-        # Concatenate all logits
-        reconstruction = torch.cat(output_logits, dim=1)  # (batch, seq_len, vocab_size)
-        return reconstruction
+        # x is now (batch, seq_len, vocab_size) - logits for each position
+        return x
 
     def decode_autoregressive(self, z: torch.Tensor, max_length: int,
                             use_beam_search: bool = False, beam_size: int = 5) -> torch.Tensor:
