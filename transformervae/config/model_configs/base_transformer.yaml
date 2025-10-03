@@ -20,22 +20,22 @@ encoder:
 
   - layer_type: "pooling"
     input_dim: 256
-    output_dim: 256
+    output_dim: 768  # 3 * 256 = 768 (mean + max + initial token concatenated)
     dropout: 0.0
     activation: "linear"
     layer_params:
-      pooling_type: "mean"
+      pooling_type: "concat_all"
 
 sampler:
   - layer_type: "latent_sampler"
-    input_dim: 256
-    output_dim: 64
+    input_dim: 768  # Changed from 256 to match pooling output
+    output_dim: 256   # Latent dimension (keep small as per paper)
     dropout: 0.0
     activation: "linear"
 
 decoder:
   - layer_type: "transformer_decoder"
-    input_dim: 64
+    input_dim: 256  # Should match embedding dimension, not latent dimension
     output_dim: 256
     dropout: 0.0
     activation: "relu"

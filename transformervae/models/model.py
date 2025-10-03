@@ -66,6 +66,11 @@ class TransformerVAE(ModelInterface):
             layer = create_layer(layer_config)
             self.encoder_layers.append(layer)
 
+        # Positional encoding for encoder (as per paper)
+        # Should be applied after embedding, so use encoder[0].output_dim (embedding dim)
+        embed_dim = config.encoder[0].output_dim
+        self.encoder_positional_encoding = PositionalEncoding(d_model=embed_dim, dropout=0.0)
+
         # Latent sampler
         self.sampler = create_layer(config.sampler[0])  # Assume single sampler layer
 
@@ -79,6 +84,9 @@ class TransformerVAE(ModelInterface):
         vocab_size = config.decoder[-1].output_dim
         embed_dim = config.decoder[0].input_dim
         self.embedding = nn.Embedding(vocab_size, embed_dim)
+
+        # Positional encoding for decoder (as per paper)
+        self.decoder_positional_encoding = PositionalEncoding(d_model=embed_dim, dropout=0.0)
 
         # Latent projection layer to match embedding dimension
         latent_dim = config.sampler[0].output_dim
@@ -169,14 +177,23 @@ class TransformerVAE(ModelInterface):
         Encode input to latent space.
 
         Args:
-            x: Input tensor
+            x: Input tensor (batch_size, seq_len) - token indices
 
         Returns:
             Tuple of (mu, logvar) tensors
         """
         # Pass through encoder layers
-        for layer in self.encoder_layers:
+        # First layer is embedding: (batch, seq_len) -> (batch, seq_len, embed_dim)
+        for i, layer in enumerate(self.encoder_layers):
             x = layer(x)
+
+            # Add positional encoding after embedding layer (as per paper)
+            if i == 0:  # After embedding layer
+                x = self.encoder_positional_encoding(x)
+
+        # x is now the memory output from encoder
+        # Note: If config has pooling layer, it's already applied in encoder_layers
+        # Otherwise, we need to pool here as described in paper
 
         # Sample latent variables using sampler
         mu, logvar, z = self.sampler(x)
@@ -224,7 +241,11 @@ class TransformerVAE(ModelInterface):
         # Get embeddings for the entire sequence at once
         embeddings = self.embedding(decoder_input)  # (batch, seq_len, embed_dim)
 
+        # Add positional encoding (as per paper)
+        embeddings = self.decoder_positional_encoding(embeddings)
+
         # Project latent and add to all positions (broadcast)
+        # As per paper: "the latent representation is added to the embedding of each token during decoding"
         latent_features = self.latent_projection(z)  # (batch, embed_dim)
         embeddings = embeddings + latent_features.unsqueeze(1)  # (batch, seq_len, embed_dim)
 
@@ -264,16 +285,19 @@ class TransformerVAE(ModelInterface):
         sequences = torch.ones(batch_size, 1, dtype=torch.long, device=device)  # SOS = 1
         logits_list = []
 
-        # Embedding and projection layers are pre-initialized in __init__
+        # Pre-compute latent projection (will be added to ALL positions as per paper)
+        latent_features = self.latent_projection(z)  # (batch, embed_dim)
 
         for step in range(max_length):
             # Get embeddings for current sequence
             embeddings = self.embedding(sequences)
 
-            # Add latent variables only to the first position (start token)
-            if step == 0:
-                latent_embedded = self.latent_projection(z).unsqueeze(1)  # (batch, 1, embed_dim)
-                embeddings[:, 0:1, :] = embeddings[:, 0:1, :] + latent_embedded
+            # Add positional encoding (as per paper)
+            embeddings = self.decoder_positional_encoding(embeddings)
+
+            # Add latent variables to ALL positions (as per paper)
+            # "the latent representation is added to the embedding of each token during decoding"
+            embeddings = embeddings + latent_features.unsqueeze(1)  # (batch, seq_len, embed_dim)
 
             # Pass through decoder layers
             x = embeddings
@@ -308,22 +332,24 @@ class TransformerVAE(ModelInterface):
         sequences = torch.ones(batch_size, beam_size, 1, dtype=torch.long, device=device)  # SOS
         log_probs = torch.zeros(batch_size, beam_size, device=device)
 
-        # Embedding and projection layers are pre-initialized in __init__
+        # Pre-compute latent features for all beams
+        z_expanded = z.unsqueeze(1).expand(-1, beam_size, -1).reshape(batch_size * beam_size, -1)
+        latent_features = self.latent_projection(z_expanded)  # (batch*beam, embed_dim)
 
         finished_sequences = []
 
         for step in range(max_length):
-            # Expand latent variables for all beams
-            z_expanded = z.unsqueeze(1).expand(-1, beam_size, -1).reshape(batch_size * beam_size, -1)
             sequences_flat = sequences.reshape(batch_size * beam_size, -1)
 
             # Get embeddings
             embeddings = self.embedding(sequences_flat)
 
-            # Add latent variables only to the first position (start token)
-            if step == 0:
-                latent_embedded = self.latent_projection(z_expanded).unsqueeze(1)  # (batch*beam, 1, embed_dim)
-                embeddings[:, 0:1, :] = embeddings[:, 0:1, :] + latent_embedded
+            # Add positional encoding (as per paper)
+            embeddings = self.decoder_positional_encoding(embeddings)
+
+            # Add latent variables to ALL positions (as per paper)
+            # "the latent representation is added to the embedding of each token during decoding"
+            embeddings = embeddings + latent_features.unsqueeze(1)  # (batch*beam, seq_len, embed_dim)
 
             # Pass through decoder
             x = embeddings

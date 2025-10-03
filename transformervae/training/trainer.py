@@ -15,6 +15,7 @@ from pathlib import Path
 from tqdm import tqdm
 from transformervae.config.basic_config import VAETrainingConfig
 from transformervae.models.model import TransformerVAE
+from transformervae.data.tokenizer import SMILESTokenizer
 from .evaluator import TrainingEvaluator
 from .callbacks import TrainingCallbacks
 from rdkit import Chem
@@ -39,7 +40,7 @@ class VAETrainer:
         self.train_loader = None
         self.val_loader = None
         self.device = None
-        self.tokenizer = tokenizer
+        self.tokenizer: SMILESTokenizer = tokenizer
 
         # Training state
         self.current_epoch = 0
@@ -516,7 +517,8 @@ class VAETrainer:
         # Compare molecules
         correct_molecules = 0
         total_molecules = len(original_smiles)
-
+        print("original_smiles:", original_smiles[:3])
+        print("predicted_smiles:", predicted_smiles[:3])
         for orig_smi, pred_smi in zip(original_smiles, predicted_smiles):
             if self._molecules_equivalent(orig_smi, pred_smi, Chem):
                 correct_molecules += 1

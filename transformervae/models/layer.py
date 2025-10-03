@@ -363,9 +363,17 @@ class PoolingLayer(LayerInterface):
             )
             self.query = nn.Parameter(torch.randn(1, 1, config.input_dim))
 
+        # Determine actual pooling output dimension
+        if self.pooling_type == "concat_all":
+            # concat_all produces 3 * input_dim (mean + max + initial)
+            pooling_output_dim = 3 * config.input_dim
+        else:
+            # Other pooling types produce input_dim
+            pooling_output_dim = config.input_dim
+
         # Output projection if needed
-        if config.input_dim != config.output_dim:
-            self.output_projection = nn.Linear(config.input_dim, config.output_dim)
+        if pooling_output_dim != config.output_dim:
+            self.output_projection = nn.Linear(pooling_output_dim, config.output_dim)
         else:
             self.output_projection = None
 
@@ -380,7 +388,7 @@ class PoolingLayer(LayerInterface):
             mask: Optional mask for valid positions
 
         Returns:
-            Pooled tensor of shape (batch_size, features)
+            Pooled tensor of shape (batch_size, features) or (batch_size, 3*features) for concat_all
         """
         if self.pooling_type == "mean":
             if mask is not None:
@@ -398,6 +406,27 @@ class PoolingLayer(LayerInterface):
                 pooled = x_masked.max(dim=1)[0]
             else:
                 pooled = x.max(dim=1)[0]
+
+        elif self.pooling_type == "concat_all":
+            # As per paper: "The mean and maximum of the memory were pooled and
+            # concatenated with the memory corresponding to the initial token"
+            if mask is not None:
+                # Masked mean pooling
+                mask_expanded = mask.unsqueeze(-1).float()
+                x_masked = x * mask_expanded
+                mean_pooled = x_masked.sum(dim=1) / mask_expanded.sum(dim=1).clamp(min=1e-9)
+
+                # Masked max pooling
+                x_masked_max = x.masked_fill(~mask.unsqueeze(-1), float('-inf'))
+                max_pooled = x_masked_max.max(dim=1)[0]
+            else:
+                mean_pooled = x.mean(dim=1)  # (batch_size, features)
+                max_pooled = x.max(dim=1)[0]  # (batch_size, features)
+
+            initial_token = x[:, 0, :]  # (batch_size, features)
+
+            # Concatenate all three
+            pooled = torch.cat([mean_pooled, max_pooled, initial_token], dim=-1)  # (batch_size, 3*features)
 
         elif self.pooling_type == "attention":
             # Attention-based pooling

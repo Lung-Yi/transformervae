@@ -1,8 +1,8 @@
 # MOSES Dataset Training Configuration - Fixed
 # Optimized for training on the MOSES molecular dataset with proper beta scheduling
 
-learning_rate: 0.001  # Reduced learning rate
-batch_size: 128
+learning_rate: 0.003  # Reduced learning rate
+batch_size: 64
 epochs: 100
 beta: 0.1  # Increased beta to prevent posterior collapse
 optimizer_type: "adam"
@@ -15,14 +15,14 @@ random_seed: 42
 scheduler_config:
   type: "reduce_on_plateau"
   patience: 10
-  factor: 0.5
+  factor: 0.95
   min_lr: 0.00001
 
 # Beta annealing schedule to gradually increase KL weight
 beta_schedule:
-  type: "linear"  # linear, cosine, or cyclical
-  start_beta: 0.01   # Further increased
-  end_beta: 0.1     # Much higher to force latent usage
+  type: "cyclical"  # linear, cosine, or cyclical
+  start_beta: 0.001   # Further increased
+  end_beta: 0.01     # Much higher to force latent usage
   warmup_epochs: 10 # Faster ramp-up
 
 # Dataset-specific configuration
