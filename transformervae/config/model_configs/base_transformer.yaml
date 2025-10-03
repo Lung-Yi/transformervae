@@ -3,7 +3,7 @@
 
 encoder:
   - layer_type: "embedding"
-    input_dim: 26
+    input_dim: 25
     output_dim: 256
     dropout: 0.0
     activation: "relu"
@@ -46,6 +46,6 @@ decoder:
 
   - layer_type: "linear"
     input_dim: 256
-    output_dim: 26
+    output_dim: 25
     dropout: 0.0
     activation: "linear"

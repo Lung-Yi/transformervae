@@ -255,6 +255,16 @@ def setup_model_and_trainer(model_config: DetailedModelArchitecture,
     """Setup model and trainer."""
     print("Setting up model...")
 
+    # Update model config to match tokenizer vocab size
+    actual_vocab_size = tokenizer.get_vocab_size()
+    print(f"Updating model config to use vocab_size={actual_vocab_size}")
+
+    # Update encoder embedding input_dim
+    model_config.encoder[0].input_dim = actual_vocab_size
+
+    # Update decoder final layer output_dim
+    model_config.decoder[-1].output_dim = actual_vocab_size
+
     # Create model
     model = TransformerVAE.from_config(model_config)
     model = model.to(device)

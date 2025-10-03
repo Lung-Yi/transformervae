@@ -30,7 +30,7 @@ dataset_config:
   dataset_type: "moses"
   data_path: "data/moses"
   max_sequence_length: 100
-  vocab_size: 26
+  vocab_size: 25
   train_split: 0.8
   val_split: 0.1
   test_split: 0.1
